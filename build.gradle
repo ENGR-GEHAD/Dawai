@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.dawai.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.dawai.app"
+        minSdk 26          // Android 8.0 وما فوق
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // يوقَّع بمفتاح debug حتى يكون الملف قابلاً للتثبيت مباشرة
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// لا توجد أي مكتبات خارجية — Android framework فقط
+dependencies {
+}
