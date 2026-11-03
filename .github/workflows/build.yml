@@ -1,0 +1,47 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Arrange project folders
+        run: |
+          set -e
+          M=app/src/main
+          mkdir -p $M/java/com/dawai/app $M/assets $M/res/values $M/res/drawable $M/res/mipmap-anydpi-v26
+          # build.gradle (module) and "build (1).gradle" (root)
+          mv build.gradle app/build.gradle
+          mv "build (1).gradle" build.gradle
+          mv AndroidManifest.xml $M/
+          mv MainActivity.java Reminders.java ReminderReceiver.java BootReceiver.java $M/java/com/dawai/app/
+          mv index.html $M/assets/
+          mv strings.xml styles.xml $M/res/values/
+          mv ic_launcher_fg.xml ic_notify.xml $M/res/drawable/
+          mv ic_launcher.xml $M/res/mipmap-anydpi-v26/
+          find . -path ./.git -prune -o -type f -print | sort
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: gradle assembleRelease --no-daemon
+
+      - name: Rename
+        run: cp app/build/outputs/apk/release/app-release.apk Dawai.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dawai-APK
+          path: Dawai.apk
