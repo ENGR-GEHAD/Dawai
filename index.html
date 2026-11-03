@@ -111,6 +111,13 @@ label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px;font-wei
 .toast{position:fixed;bottom:calc(100px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:14px;font-size:14px;z-index:40;opacity:0;transition:.3s;pointer-events:none}
 .toast.on{opacity:1}
 .banner{background:var(--accent-soft);color:#8A6A4B;border-radius:14px;padding:12px 14px;font-size:14px;margin-bottom:12px;display:flex;gap:10px;align-items:center}
+.st{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.st:last-child{border-bottom:0}
+.st .ico{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;flex:none}
+.st .ico.y{background:var(--ok-soft);color:var(--ok)}.st .ico.n{background:var(--bad-soft);color:var(--bad)}
+.st .tx{flex:1;font-size:14px}.st .tx small{display:block;color:var(--muted);font-size:12px}
+.st .btn{padding:8px 12px;font-size:13px}
+.note{background:var(--accent-soft);color:#8A6A4B;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:12px}
 .banner .btn{padding:8px 12px;background:var(--accent);color:#fff;white-space:nowrap}
 </style>
 </head>
@@ -202,6 +209,17 @@ label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px;font-wei
     <button class="btn btn-p" id="aTake">تناولته ✓</button>
     <button class="btn btn-s" id="aSnooze">ذكّرني بعد ١٠ دقائق</button>
     <button class="btn btn-g" id="aSkip">تخطّي هذه الجرعة</button>
+  </div>
+</div>
+
+<!-- حالة التنبيهات -->
+<div class="sheet-bg" id="statBg">
+  <div class="sheet">
+    <h2>حالة التنبيهات</h2>
+    <div id="statList"></div>
+    <div class="note" id="statNote"></div>
+    <button class="btn btn-p" id="testBtn" style="width:100%;margin-top:14px;padding:14px">🔔 تجربة التنبيه بعد ١٠ ثوانٍ</button>
+    <div class="row" style="margin-top:8px"><button class="btn btn-g" id="appSet">إعدادات التطبيق</button><button class="btn btn-g" id="statClose">إغلاق</button></div>
   </div>
 </div>
 
@@ -404,16 +422,45 @@ function nativePerm(){ try{ return NATIVE.hasPermission(); }catch(e){ return tru
 function renderPerm(){
   const need = meds.length && (NATIVE ? !nativePerm() : (canNotify && Notification.permission==="default"));
   $("#permBanner").innerHTML = need ? '<div class="banner"><span>فعّل الإشعارات ليصلك التذكير في موعد الدواء</span><button class="btn" id="permBtn">تفعيل</button></div>' : "";
-  if(need) $("#permBtn").onclick=askPerm;
+  if(need) $("#permBtn").onclick= NATIVE ? ()=>$("#bellBtn").click() : askPerm;
   $("#bellBtn").classList.toggle("off", NATIVE ? !nativePerm() : !(canNotify && Notification.permission==="granted"));
 }
 function askPerm(){
   if(NATIVE){ try{ NATIVE.requestPermission(); }catch(e){} return; }
   if(canNotify && Notification.permission==="default"){ try{ Notification.requestPermission().then(renderPerm); }catch(e){} }
 }
-window.onNativePerm = renderPerm;
+window.onNativePerm = ()=>{ renderPerm(); if($("#statBg").classList.contains("on")) renderStatus(); };
+function nativeStatus(){ try{ return JSON.parse(NATIVE.status()||"{}"); }catch(e){ return {}; } }
+function renderStatus(){
+  const st=nativeStatus();
+  const rows=[
+    ["permission","إذن الإشعارات","بدونه لا يظهر أي تنبيه","notif"],
+    ["channel","قناة «مواعيد الدواء» مفعّلة بأهمية عالية","حتى يظهر التنبيه أعلى الشاشة","channel"],
+    ["sound","صوت التنبيه","الصوت مفعّل في القناة","channel"],
+    ["exact","المنبّه الدقيق","حتى يرنّ في الدقيقة المحددة","exact"],
+    ["battery","مستثنى من توفير البطارية","حتى لا يوقفه النظام وهو مغلق","battery"],
+    ["fullscreen","الظهور على الشاشة كاملة","فوق شاشة القفل","fullscreen"]
+  ];
+  $("#statList").innerHTML=rows.map(([k,t,sub,fix])=>{
+    const ok=st[k]!==false;
+    return '<div class="st"><div class="ico '+(ok?'y':'n')+'">'+(ok?'✓':'!')+'</div><div class="tx">'+t+'<small>'+sub+'</small></div>'+(ok?'':'<button class="btn btn-p" data-fix="'+fix+'">إصلاح</button>')+'</div>';
+  }).join("");
+  let n="عدد المنبّهات المجدولة: "+AR(st.count||0);
+  if(st.next>0){ const d=new Date(st.next); n+=" — التالي: "+fmtTime(pad(d.getHours())+":"+pad(d.getMinutes()))+" "+d.toLocaleDateString("ar-SA-u-ca-gregory",{weekday:"long"}); }
+  const mk=String(st.maker||"").toLowerCase();
+  if(/xiaomi|redmi|poco|huawei|honor|oppo|realme|vivo|oneplus|samsung|infinix|tecno/.test(mk))
+    n+="<br>جوالك ("+esc(st.maker)+"): من «إعدادات التطبيق» فعّل <b>التشغيل التلقائي</b> واجعل البطارية <b>بلا قيود</b>.";
+  $("#statNote").innerHTML=n;
+  $("#statList").querySelectorAll("[data-fix]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.fix==="notif") askPerm(); else { try{ NATIVE.fix(b.dataset.fix); }catch(e){} }
+  });
+}
+$("#testBtn").onclick=()=>{ try{ syncNative(); NATIVE.test(10); toast("انتظر ١٠ ثوانٍ… يمكنك قفل الشاشة أو إغلاق التطبيق"); }catch(e){} };
+$("#appSet").onclick=()=>{ try{ NATIVE.fix("app"); }catch(e){} };
+$("#statClose").onclick=()=>$("#statBg").classList.remove("on");
+$("#statBg").onclick=e=>{ if(e.target.id==="statBg") $("#statBg").classList.remove("on"); };
 $("#bellBtn").onclick=()=>{
-  if(NATIVE){ if(nativePerm()) return toast("الإشعارات مفعّلة ✓ — ستصلك حتى والتطبيق مغلق"); askPerm(); return; }
+  if(NATIVE){ renderStatus(); $("#statBg").classList.add("on"); return; }
   if(!canNotify) return toast("المتصفح لا يدعم الإشعارات — ستظهر التنبيهات داخل التطبيق");
   if(Notification.permission==="granted") return toast("الإشعارات مفعّلة ✓");
   if(Notification.permission==="denied") return toast("الإشعارات محظورة — فعّلها من إعدادات المتصفح");
@@ -431,7 +478,7 @@ function consumeNative(){
   });
   if(arr.length){ save(); renderAll(); }
 }
-window.onNativeResume = ()=>{ consumeNative(); renderAll(); check(); };
+window.onNativeResume = ()=>{ consumeNative(); renderAll(); check(); if($("#statBg").classList.contains("on")) renderStatus(); };
 
 let audioCtx=null;
 function chime(){

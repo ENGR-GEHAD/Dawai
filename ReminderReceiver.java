@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-/** يستقبل المنبّه ويعرض الإشعار، ويعالج أزرار الإشعار. */
+/** يستقبل المنبّه ويعرض الإشعار (مع شاشة كاملة فوق القفل)، ويعالج أزرار الإشعار. */
 public class ReminderReceiver extends BroadcastReceiver {
 
     static final String ACTION_FIRE = "com.dawai.app.FIRE";
@@ -30,7 +30,8 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         if (ACTION_TAKEN.equals(action)) {
             nm.cancel(notifId);
-            Reminders.addPending(c, medId + "|" + date + "|" + time, "taken");
+            if (!intent.getBooleanExtra("test", false))
+                Reminders.addPending(c, medId + "|" + date + "|" + time, "taken");
             return;
         }
         if (ACTION_SNOOZE.equals(action)) {
@@ -45,33 +46,41 @@ public class ReminderReceiver extends BroadcastReceiver {
         String name = intent.getStringExtra("name");
         String dose = intent.getStringExtra("dose");
         String note = intent.getStringExtra("note");
-        String body = dose + (note != null && !note.isEmpty() ? " — " + note : "");
+        String body = (dose == null ? "" : dose) + (note != null && !note.isEmpty() ? " — " + note : "");
 
-        Intent open = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent open = new Intent(c, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra("fromAlarm", true);
         PendingIntent openPi = PendingIntent.getActivity(c, notifId, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent taken = new Intent(intent).setClass(c, ReminderReceiver.class).setAction(ACTION_TAKEN).putExtra("date", date);
         Intent snooze = new Intent(intent).setClass(c, ReminderReceiver.class).setAction(ACTION_SNOOZE).putExtra("date", date);
 
-        Notification n = new Notification.Builder(c, Reminders.CHANNEL)
+        Notification.Builder b = new Notification.Builder(c, Reminders.CHANNEL)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setColor(Color.parseColor("#5B8A7E"))
-                .setContentTitle("حان موعد الدواء: " + name)
+                .setContentTitle("💊 حان موعد الدواء: " + name)
                 .setContentText(body)
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setCategory(Notification.CATEGORY_ALARM)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setAutoCancel(true)
+                .setShowWhen(true)
                 .setContentIntent(openPi)
+                // يظهر على الشاشة فوراً حتى لو كانت مقفلة
+                .setFullScreenIntent(openPi, true)
                 .addAction(new Notification.Action.Builder(null, "تناولته ✓",
                         Reminders.pending(c, notifId + 1, taken)).build())
                 .addAction(new Notification.Action.Builder(null, "بعد ١٠ دقائق",
-                        Reminders.pending(c, notifId + 2, snooze)).build())
-                .build();
+                        Reminders.pending(c, notifId + 2, snooze)).build());
+
+        Notification n = b.build();
+        n.flags |= Notification.FLAG_INSISTENT;   // يكرّر الصوت حتى يتفاعل المستخدم
         try {
             nm.notify(notifId, n);
         } catch (SecurityException ignored) {
-            // لم يُمنح إذن الإشعارات
+            // لم يُمنح إذن الإشعارات — تظهر الحالة في شاشة «حالة التنبيهات»
         }
 
         // جدولة الموعد التالي لهذا الدواء

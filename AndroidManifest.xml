@@ -8,6 +8,10 @@
     <!-- منبّه دقيق: يُمنح تلقائياً لتطبيقات التذكير على أندرويد 13+ -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <!-- إظهار التنبيه على الشاشة كاملة فوق شاشة القفل -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- طلب استثناء التطبيق من توفير البطارية -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"
